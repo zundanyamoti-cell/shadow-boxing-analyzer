@@ -813,14 +813,15 @@ function stopCamera(){ if (state.cameraStream){ state.cameraStream.getTracks().f
 function showAnalyze(){
   $('step-input').classList.add('hidden'); $('step-analyze').classList.remove('hidden'); $('step-report').classList.add('hidden');
   const lv = $('s-level'); if (lv) lv.textContent = CONFIG.detectionLevel;
-  // 解析中はすべてのボタンを無効化（誤操作防止）
-  ['btn-finish','btn-reset','btn-play'].forEach(id => {
-    const el=$(id); if(!el) return;
-    el.disabled=true; el.style.opacity='0.38'; el.style.pointerEvents='none';
-  });
-  const sk=$('seek'); if(sk){ sk.disabled=true; sk.style.opacity='0.38'; }
+  // 解析中: btn-finishのみ完全無効化（モバイルタッチも防止）
+  const _bf=$('btn-finish');
+  if(_bf){ _bf.disabled=true; _bf.style.opacity='0.38'; _bf.style.pointerEvents='none'; _bf.style.touchAction='none'; }
+  // btn-play/seekは見た目だけ変更してstateフラグで制御（mobile対応）
+  const _bp=$('btn-play'); if(_bp){ _bp.style.opacity='0.38'; }
+  const _sk=$('seek'); if(_sk){ _sk.style.opacity='0.38'; }
 }
 robust($('btn-play'), () => {
+  if (state.running) return; // 解析中は操作不可（mobile対応）
   const v = $('video');
   if (v.paused){ v.play(); $('btn-play').textContent='⏸'; } else { v.pause(); $('btn-play').textContent='▶'; }
 });
@@ -834,7 +835,10 @@ robust($('btn-save-record'), () => {
   const st = $('save-record-status');
   if (st){ st.textContent = '✅ 保存しました'; setTimeout(()=>{ st.textContent=''; }, 3000); }
 });
-$('seek').addEventListener('input', e => { const v = $('video'); if (v.duration) v.currentTime = (e.target.value/1000)*v.duration; });
+$('seek').addEventListener('input', e => {
+  if (state.running) return; // 解析中は操作不可（mobile対応）
+  const v = $('video'); if (v.duration) v.currentTime = (e.target.value/1000)*v.duration;
+});
 $('toggle-guard').addEventListener('change', e => {
   state.guardSensorOn = e.target.checked;
   ['guard-live','guard-orig','guard-skel'].forEach(id => $(id).classList.toggle('off', !state.guardSensorOn));
@@ -1313,15 +1317,16 @@ function seekToPunch(idx, autoStop=true){
 //  Report
 // ============================================================
 function finishAndReport(){
+  // 動画が終了していないタイミングの呼び出しは無視（モバイル誤タップ防止）
+  if (!$('video').ended) return;
   state.running = false;
   if (state.rafId) cancelAnimationFrame(state.rafId);
   $('video').pause(); stopCamera();
-  // ボタンを再有効化
-  ['btn-finish','btn-reset','btn-play'].forEach(id => {
-    const el=$(id); if(!el) return;
-    el.disabled=false; el.style.opacity=''; el.style.pointerEvents='';
-  });
-  const sk=$('seek'); if(sk){ sk.disabled=false; sk.style.opacity=''; }
+  // btn-finish・btn-play・seekを元に戻す
+  const _bf=$('btn-finish');
+  if(_bf){ _bf.disabled=false; _bf.style.opacity=''; _bf.style.pointerEvents=''; _bf.style.touchAction=''; }
+  const _bp=$('btn-play'); if(_bp){ _bp.style.opacity=''; }
+  const _sk=$('seek'); if(_sk){ _sk.style.opacity=''; }
   rebuild();
   setupReview();
   $('step-analyze').classList.add('hidden');
