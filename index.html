@@ -701,18 +701,18 @@ const applyTheme = t => { document.documentElement.setAttribute('data-theme', t)
 applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
 const robust = (el, fn) => {
   if (!el) return;
-  // pointerdown: iOS/Android でclick遅延なし。ただしスクロール開始時は発火させない
-  let pointerMoved = false;
-  el.addEventListener('pointerdown', e => { pointerMoved = false; });
-  el.addEventListener('pointermove', () => { pointerMoved = true; });
+  // pointerdown: iOS/Android でclick遅延なし
+  // 距離ベースのスクロール判定（10px以上動いたらスクロール扱い）
+  let sx=0, sy=0;
+  el.addEventListener('pointerdown', e => { sx=e.clientX; sy=e.clientY; });
   el.addEventListener('pointerup', e => {
-    if (pointerMoved) return;
+    if (Math.hypot(e.clientX-sx, e.clientY-sy) > 10) return; // スクロール中はスキップ
     e.preventDefault(); // click重複防止
     fn(e);
   });
   // フォールバック: pointerevents非対応ブラウザ向け
   el.addEventListener('click', e => {
-    if (e.detail === 0) fn(e); // pointerupで処理済みの場合はdetail>0になる
+    if (e.detail === 0) fn(e);
   });
 };
 robust($('btn-theme'), () => applyTheme(document.documentElement.getAttribute('data-theme')==='light'?'dark':'light'));
