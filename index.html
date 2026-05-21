@@ -813,6 +813,12 @@ function stopCamera(){ if (state.cameraStream){ state.cameraStream.getTracks().f
 function showAnalyze(){
   $('step-input').classList.add('hidden'); $('step-analyze').classList.remove('hidden'); $('step-report').classList.add('hidden');
   const lv = $('s-level'); if (lv) lv.textContent = CONFIG.detectionLevel;
+  // 解析中はすべてのボタンを無効化（誤操作防止）
+  ['btn-finish','btn-reset','btn-play'].forEach(id => {
+    const el=$(id); if(!el) return;
+    el.disabled=true; el.style.opacity='0.38'; el.style.pointerEvents='none';
+  });
+  const sk=$('seek'); if(sk){ sk.disabled=true; sk.style.opacity='0.38'; }
 }
 robust($('btn-play'), () => {
   const v = $('video');
@@ -1088,8 +1094,8 @@ function extractFeatures(side, wrist, ang){
   const bodyLine = ((lm[11].y+lm[12].y)/2 + (lm[23].y+lm[24].y)/2)/2;
   // ボディ判定: 手首が腹部〜胸の高さにある（腰ライン以下・腰より極端に下は除外）
   const hipLine = lm ? (lm[23].y + lm[24].y) / 2 : bodyLine + 0.15;
-  const isBodyHeight = wrist.y > bodyLine + 0.03   // 腹部より少し下
-    && wrist.y < hipLine + 0.08;                    // 腰より大きく下には行かない
+  const isBodyHeight = wrist.y > bodyLine + 0.06   // 腹部より明確に下（誤検出削減）
+    && wrist.y < hipLine + 0.02;                    // 腰ラインをほぼ超えない
   // speed
   const recent = h.slice(-8);
   const heightM = CONFIG.heightCm/100;
@@ -1118,8 +1124,8 @@ function classify(side, f){
     // フック: 肘が曲がったまま横方向に弧を描く
     type = 'HOOK';
     reason = `横弧軌道(横${f.lateral.toFixed(2)} / 縦${f.vertical.toFixed(2)}, 肘${f.peakAng.toFixed(0)}°)`;
-  } else if (f.isBodyHeight){
-    // ボディ: 手首が腹部〜腰ラインの高さ
+  } else if (f.isBodyHeight && f.wristDisp3D >= 0.08){
+    // ボディ: 手首が腹部〜腰ラインの高さ + 最低変位あり（誤検出削減）
     type = 'BODY';
     reason = `腰高さへの打撃(Y=${f.wristY.toFixed(2)})`;
   } else if (f.peakAng >= 145 && f.wristDisp3D >= 0.11){
@@ -1310,6 +1316,12 @@ function finishAndReport(){
   state.running = false;
   if (state.rafId) cancelAnimationFrame(state.rafId);
   $('video').pause(); stopCamera();
+  // ボタンを再有効化
+  ['btn-finish','btn-reset','btn-play'].forEach(id => {
+    const el=$(id); if(!el) return;
+    el.disabled=false; el.style.opacity=''; el.style.pointerEvents='';
+  });
+  const sk=$('seek'); if(sk){ sk.disabled=false; sk.style.opacity=''; }
   rebuild();
   setupReview();
   $('step-analyze').classList.add('hidden');
@@ -1483,9 +1495,11 @@ function renderCalloutGroup(tl, events){
       b.innerHTML = `↔️<span>${fmtTime(ev.tSec)}</span>`;
     }
     b.addEventListener('click', () => {
-      const vid = $('video'); if (!vid) return;
-      vid.currentTime = Math.max(0, ev.tSec - 0.5);
-      if (vid.paused) vid.play().catch(()=>{});
+      // 結果画面ではレビュー用動画を再生
+      const rvO=$('rv-orig'), rvS=$('rv-skel');
+      const t=Math.max(0, ev.tSec - 0.5);
+      if(rvO){ rvO.currentTime=t; rvO.play().catch(()=>{}); }
+      if(rvS){ rvS.currentTime=t; rvS.play().catch(()=>{}); }
     });
     grp.appendChild(b);
   });
@@ -1684,11 +1698,8 @@ function openTypeEditor(idx, chipEl){
       p.type = type;
       p.label = (p.hand==='L'?'左':'右') + PUNCH_LABEL_JA[type];
       editor.remove();
-      renderTimeline();
-      renderPunchAverages();
-      const cnt = {}; PUNCH_TYPES.forEach(t=>cnt[t]=0);
-      state.punches.forEach(q=>cnt[q.type]++);
-      renderBreakdown(cnt);
+      // 種類変更をすべての表示に反映
+      rebuild();
     });
     editor.appendChild(btn);
   });
@@ -1704,12 +1715,9 @@ function openTypeEditor(idx, chipEl){
     state.punchRight = state.punches.filter(p=>p.hand==='R').length;
     state.punchLeft  = state.punches.filter(p=>p.hand==='L').length;
     editor.remove();
-    renderTimeline();
-    renderPunchAverages();
-    const cnt = {}; PUNCH_TYPES.forEach(t=>cnt[t]=0);
-    state.punches.forEach(q=>cnt[q.type]++);
-    renderBreakdown(cnt);
     updateHUD();
+    // 削除をすべての表示に反映
+    rebuild();
   });
   editor.appendChild(delBtn);
   const rect = chipEl.getBoundingClientRect();
@@ -2351,9 +2359,11 @@ function openDuckDetail(ev){
   $('duck-replay').onclick = () => {
     $('modal-duck').classList.remove('show');
     setTimeout(() => {
-      const vid = $('video'); if (!vid) return;
-      vid.currentTime = Math.max(0, _duckTSec - 0.5);
-      if (vid.paused) vid.play().catch(()=>{});
+      // 結果画面ではレビュー用動画を再生
+      const rvO=$('rv-orig'), rvS=$('rv-skel');
+      const t=Math.max(0, _duckTSec - 0.5);
+      if(rvO){ rvO.currentTime=t; rvO.play().catch(()=>{}); }
+      if(rvS){ rvS.currentTime=t; rvS.play().catch(()=>{}); }
     }, 80);
   };
   $('modal-duck').classList.add('show');
