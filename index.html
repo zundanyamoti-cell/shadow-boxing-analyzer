@@ -857,7 +857,8 @@ document.querySelectorAll('.pos-btn').forEach(btn => {
 
 function resetAll(){
   state.running = false;
-  if (state.rafId) cancelAnimationFrame(state.rafId);
+  if (state.rafId) clearTimeout(state.rafId);
+  releaseWakeLock();
   stopReviewLoop();
   $('video').pause();
   if (state.fileSrcUrl){ URL.revokeObjectURL(state.fileSrcUrl); state.fileSrcUrl=null; }
@@ -881,10 +882,38 @@ function resetMetrics(){
   updateHUD();
 }
 
-// Main loop
-function startLoop(){ state.running=true; state.rafId=requestAnimationFrame(loop); }
-async function loop(){
+// Wake Lock: スクリーンロック防止
+let _wakeLock = null;
+async function requestWakeLock(){
+  if ('wakeLock' in navigator){
+    try { _wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+  }
+}
+function releaseWakeLock(){
+  if (_wakeLock){ _wakeLock.release().catch(()=>{}); _wakeLock = null; }
+}
+// ページが再表示されたらWake Lockを再取得 & 動画を再開
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.running){
+    const v = $('video');
+    if (v && !v.ended && v.paused) v.play().catch(()=>{});
+    if (!_wakeLock) requestWakeLock();
+  }
+});
+
+// Main loop — rAFの代わりにsetTimeoutを使うことでバックグラウンドでも解析を継続
+function startLoop(){ state.running=true; requestWakeLock(); _scheduleLoop(); }
+function _scheduleLoop(){
   if (!state.running) return;
+  const tStart = performance.now();
+  _runLoopFrame().finally(() => {
+    if (!state.running) return;
+    const elapsed = performance.now() - tStart;
+    // 表示中は33ms(~30fps)、バックグラウンドでも動かし続ける
+    state.rafId = setTimeout(_scheduleLoop, Math.max(0, 33 - elapsed));
+  });
+}
+async function _runLoopFrame(){
   const v = $('video'), cv = $('overlay');
   if (v.videoWidth && (cv.width !== v.videoWidth || cv.height !== v.videoHeight)){
     cv.width = v.videoWidth; cv.height = v.videoHeight;
@@ -905,8 +934,9 @@ async function loop(){
       if (v.ended) finishAndReport();
     }
   }
-  state.rafId = requestAnimationFrame(loop);
 }
+// 後方互換のためloop関数も残す（他から呼ばれている場合の保険）
+async function loop(){ await _runLoopFrame(); }
 
 const POSE_CONNECTIONS = PoseLandmarker.POSE_CONNECTIONS;
 const elCanvas = $('overlay');
@@ -1317,7 +1347,8 @@ function finishAndReport(){
   // 動画が終了していないタイミングの呼び出しは無視（モバイル誤タップ防止）
   if (!$('video').ended) return;
   state.running = false;
-  if (state.rafId) cancelAnimationFrame(state.rafId);
+  if (state.rafId) clearTimeout(state.rafId);
+  releaseWakeLock();
   $('video').pause(); stopCamera();
   // btn-finish・btn-play・seekを元に戻す
   const _bf=$('btn-finish');
@@ -2835,6 +2866,7 @@ function openRecordDetail(i){
       <div style="background:var(--paper2);border-radius:10px;padding:10px">
         <div style="font-size:11px;color:var(--muted)">平均速度</div>
         <div style="font-size:20px;font-weight:800">${r.avgSp}<span style="font-size:12px;font-weight:400"> m/s</span></div>
+      </div>
       </div>
       <div style="background:var(--paper2);border-radius:10px;padding:10px">
         <div style="font-size:11px;color:var(--muted)">ガード維持率</div>
