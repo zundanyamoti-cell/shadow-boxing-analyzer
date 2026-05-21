@@ -408,7 +408,7 @@
     </div>
     <div class="progress"><div id="prog"></div></div>
     <div class="toolbar">
-      <button class="btn ghost" id="btn-reset">← やり直す</button>
+      <button class="btn ghost" id="btn-reset" onclick="window.resetAll && window.resetAll()">← やり直す</button>
       <button class="btn" id="btn-finish">解析を終了 →</button>
     </div>
   </section>
@@ -690,6 +690,7 @@ function _expose(){
   window.openPunchDetail  = openPunchDetail;
   window.openTypeEditor   = openTypeEditor;
   window.showRecordReport  = showRecordReport;
+  window.resetAll         = resetAll;
 }
 document.addEventListener('DOMContentLoaded', _expose);
 setTimeout(_expose, 0);
@@ -817,6 +818,11 @@ robust($('btn-play'), () => {
   if (v.paused){ v.play(); $('btn-play').textContent='⏸'; } else { v.pause(); $('btn-play').textContent='▶'; }
 });
 robust($('btn-reset'), resetAll);
+// モバイル用: touchstartで直接反応させる（最も確実な方法）
+$('btn-reset').addEventListener('touchstart', e => {
+  e.preventDefault();
+  resetAll();
+}, {passive: false});
 robust($('btn-finish'), finishAndReport);
 robust($('btn-again'), resetAll);
 robust($('btn-save-record'), () => {
