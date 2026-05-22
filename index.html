@@ -117,6 +117,52 @@
   .stat .label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase}
   .stat .value{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums}
   .stat .sub{font-size:11px;color:var(--muted)}
+  /* ── KPI Result Cards (Apple Fitness style) ── */
+  .stats.kpi{gap:14px;margin-top:16px}
+  .stats.kpi .stat{
+    background:#1c1c22;
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:18px;
+    padding:20px 18px 16px;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:0;
+    min-height:110px;
+    box-sizing:border-box;
+  }
+  .stats.kpi .stat .label{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:500;
+    letter-spacing:0.3px;
+    text-transform:none;
+    margin-bottom:10px;
+    opacity:0.75;
+  }
+  .kpi-val{display:flex;align-items:baseline;gap:4px}
+  .stats.kpi .stat .value{
+    font-size:38px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-1.5px;
+    line-height:1;
+    color:var(--ink);
+  }
+  .stats.kpi .kpi-unit{
+    font-size:15px;
+    font-weight:500;
+    color:var(--muted);
+    letter-spacing:0;
+    line-height:1;
+    padding-bottom:3px;
+  }
+  .stats.kpi .stat .sub{
+    font-size:11px;
+    color:var(--muted);
+    margin-top:6px;
+    opacity:0.65;
+  }
   .progress{height:8px;background:var(--paper2);border-radius:99px;overflow:hidden;margin-top:8px;border:1px solid var(--line)}
   .progress > div{height:100%;background:linear-gradient(90deg,var(--accent),#f0884a);width:0%}
   .toolbar{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap}
@@ -433,11 +479,25 @@
       </div>
     </div>
 
-    <div class="stats">
-      <div class="stat"><span class="label">総パンチ数</span><span class="value" id="r-punches">0</span><span class="sub" id="r-punches-sub"></span></div>
-      <div class="stat"><span class="label">消費カロリー</span><span class="value" id="r-calories">0 kcal</span></div>
-      <div class="stat"><span class="label">平均速度</span><span class="value" id="r-speed">-- m/s</span><span class="sub" id="r-speed-sub">最大 --</span></div>
-      <div class="stat"><span class="label">ガード維持率</span><span class="value" id="r-guard">--%</span></div>
+    <div class="stats kpi">
+      <div class="stat">
+        <span class="label">総パンチ数</span>
+        <div class="kpi-val"><span class="value" id="r-punches">0</span></div>
+        <span class="sub" id="r-punches-sub"></span>
+      </div>
+      <div class="stat">
+        <span class="label">消費カロリー</span>
+        <div class="kpi-val"><span class="value" id="r-calories">0</span><span class="kpi-unit">kcal</span></div>
+      </div>
+      <div class="stat">
+        <span class="label">平均速度</span>
+        <div class="kpi-val"><span class="value" id="r-speed">--</span><span class="kpi-unit">m/s</span></div>
+        <span class="sub" id="r-speed-sub">最大 --</span>
+      </div>
+      <div class="stat">
+        <span class="label">ガード維持率</span>
+        <div class="kpi-val"><span class="value" id="r-guard">--</span><span class="kpi-unit">%</span></div>
+      </div>
     </div>
 
     <h2 style="margin-top:18px">🎯 総合バランス</h2>
@@ -1391,10 +1451,10 @@ function rebuild(){
 
   $('r-punches').textContent = state.punchCount;
   $('r-punches-sub').textContent = `右 ${state.punchRight} / 左 ${state.punchLeft}`;
-  $('r-calories').textContent = kcal.toFixed(1) + ' kcal';
-  $('r-speed').textContent = avgSp.toFixed(1) + ' m/s';
+  $('r-calories').textContent = kcal.toFixed(1);
+  $('r-speed').textContent = avgSp.toFixed(1);
   $('r-speed-sub').textContent = `最大 ${maxSp.toFixed(1)} m/s`;
-  $('r-guard').textContent = (guardRate*100).toFixed(0) + '%';
+  $('r-guard').textContent = (guardRate*100).toFixed(0);
 
   const counts = {}; PUNCH_TYPES.forEach(t => counts[t]=0);
   state.punches.forEach(p => counts[p.type]++);
@@ -2784,13 +2844,13 @@ function showRecordReport(i){
   // 統計数値
   $('r-punches').textContent = r.punches||0;
   $('r-punches-sub').textContent = `右 ${r.punchRight??'-'} / 左 ${r.punchLeft??'-'}`;
-  $('r-speed').textContent = (r.avgSp||0)+' m/s';
+  $('r-speed').textContent = (r.avgSp||0);
   $('r-speed-sub').textContent = '';
-  $('r-guard').textContent = (r.guardRate||0)+'%';
+  $('r-guard').textContent = (r.guardRate||0);
   const dur = r.durSec||0;
   const mets=3, gFac=(r.gender==='female')?0.93:1.0;
   const wt = 65;
-  $('r-calories').textContent = (mets*wt*(dur/3600)*gFac).toFixed(1)+' kcal';
+  $('r-calories').textContent = (mets*wt*(dur/3600)*gFac).toFixed(1);
 
   // abilityレーダー (簡易計算)
   const cap = v=>Math.max(0,Math.min(1,v));
